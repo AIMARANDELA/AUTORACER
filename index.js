@@ -104,6 +104,48 @@ app.get('/tickets/count', async (req, res) => {
   }
 });
 
+// 2. POST /tickets/purchase - Procesar compra y enviar notificación
+app.post('/tickets/purchase', async (req, res) => {
+  try {
+    const { name, phone, cedula, email, ticketNum, reference, amount } = req.body;
+
+    // Validar datos requeridos
+    if (!name || !phone || !ticketNum || !reference || !amount) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Faltan datos requeridos' 
+      });
+    }
+
+    // Enviar notificación a Telegram
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+      const msg = `🎫 *Nueva Participación*\n\n👤 *Nombre:* ${name}\n📱 *Teléfono:* ${phone}\n🎫 *Cédula:* ${cedula || 'N/A'}\n📧 *Email:* ${email || 'N/A'}\n🎫 *Boleto:* ${ticketNum}\n💳 *Referencia:* ${reference}\n💵 *Monto:* Bs. ${amount}`;
+      
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: process.env.TELEGRAM_CHAT_ID,
+          text: msg,
+          parse_mode: 'Markdown'
+        })
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Compra procesada correctamente',
+      ticketNum 
+    });
+  } catch (e) {
+    console.error('Error en purchase:', e);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al procesar compra' 
+    });
+  }
+});
+
 // 2. POST /upload - Subir capturas de pago
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
@@ -211,3 +253,4 @@ app.post('/validate-payment', async (req, res) => {
 app.listen(port, () => {
   console.log(`App corriendo en puerto ${port}`);
 });
+
