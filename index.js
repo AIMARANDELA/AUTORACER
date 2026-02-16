@@ -1,6 +1,14 @@
 const express = require('express');
+const cors = require('cors'); // 1. Debes importar la libreria
 const { Client } = require('pg');
 const app = express();
+
+// 2. Configuración de CORS (Copia y pega esto antes de tus rutas)
+app.use(cors({
+  origin: '*', // Permite que Lovable y cualquier otro dominio se conecten
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Métodos HTTP permitidos
+  allowedHeaders: ['Content-Type', 'Authorization'] // Encabezados permitidos
+}));
 const port = process.env.PORT || 3000;
 
 // Aquí es donde Render inyectará tu dirección de Supabase
@@ -46,3 +54,4 @@ app.listen(port, () => {
   console.log(`App corriendo en puerto ${port}`);
 
 });
+
