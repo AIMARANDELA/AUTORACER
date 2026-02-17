@@ -4,7 +4,10 @@ import { createClient } from "@supabase/supabase-js";
 import fetch from "node-fetch";
 
 const app = express();
-app.use(express.json());
+
+// Aumentar límite de tamaño de JSON y urlencoded
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // CORS
 app.use((req, res, next) => {
@@ -22,7 +25,7 @@ const supabase = createClient(
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
 });
 
 // GET /tickets/count
@@ -32,7 +35,7 @@ app.get("/tickets/count", async (req, res) => {
       .from("tickets")
       .select("*", { count: "exact", head: true });
     res.json({ count: count || 0 });
-  } catch (e) {
+  } catch (e: any) {
     console.error(e);
     res.status(500).json({ error: "Error al obtener conteo" });
   }
@@ -54,7 +57,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       .from("payment-screenshots")
       .upload(filePath, req.file.buffer, {
         contentType: req.file.mimetype,
-        upsert: false
+        upsert: false,
       });
 
     if (error) {
@@ -67,9 +70,11 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       .getPublicUrl(filePath);
 
     res.json({ url: data.publicUrl });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Upload error:", e);
-    res.status(500).json({ error: "Error al subir archivo: " + e.message });
+    res
+      .status(500)
+      .json({ error: "Error al subir archivo: " + e.message });
   }
 });
 
@@ -77,11 +82,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 app.post("/validate-payment", async (req, res) => {
   try {
     // Body que manda Lovable:
-    // {
-    //   name, idNumber, phone,
-    //   bank, reference, amount,
-    //   paymentImageUrl
-    // }
+    // { name, idNumber, phone, bank, reference, amount, paymentImageUrl }
 
     const {
       name,
@@ -92,7 +93,7 @@ app.post("/validate-payment", async (req, res) => {
       amount,
       paymentImageUrl,
       email,
-      quantity
+      quantity,
     } = req.body;
 
     const cedula = idNumber || "";
@@ -109,7 +110,7 @@ app.post("/validate-payment", async (req, res) => {
       bankFrom,
       reference,
       amountPaid,
-      screenshotUrl
+      screenshotUrl,
     });
 
     // Check duplicate reference
@@ -123,7 +124,7 @@ app.post("/validate-payment", async (req, res) => {
     if (existing) {
       return res.json({
         success: false,
-        error: "Pago duplicado: esta referencia ya fue registrada."
+        error: "Pago duplicado: esta referencia ya fue registrada.",
       });
     }
 
@@ -131,7 +132,7 @@ app.post("/validate-payment", async (req, res) => {
     const aiValidation = {
       valid: true,
       confidence: 0.8,
-      details: "Validación automática aprobada"
+      details: "Validación automática aprobada",
     };
 
     // Insert participant
@@ -141,7 +142,7 @@ app.post("/validate-payment", async (req, res) => {
         name,
         cedula,
         phone,
-        email: email || ""
+        email: email || "",
       })
       .select("id")
       .single();
@@ -162,7 +163,7 @@ app.post("/validate-payment", async (req, res) => {
       reference_last4: reference,
       screenshot_url: screenshotUrl,
       status: "validated",
-      ai_validation_result: aiValidation
+      ai_validation_result: aiValidation,
     });
 
     if (payErr) {
@@ -181,15 +182,15 @@ app.post("/validate-payment", async (req, res) => {
       .maybeSingle();
 
     const startNum = (maxTicket?.ticket_number || 0) + 1;
-    const ticketNumbers = [];
-    const ticketInserts = [];
+    const ticketNumbers: number[] = [];
+    const ticketInserts: any[] = [];
 
     for (let i = 0; i < qty; i++) {
       const num = startNum + i;
       ticketNumbers.push(num);
       ticketInserts.push({
         participant_id: participant.id,
-        ticket_number: num
+        ticket_number: num,
       });
     }
 
@@ -209,11 +210,13 @@ app.post("/validate-payment", async (req, res) => {
       const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env;
 
       if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-        const msg = `🎫 *Nueva Participación*\n\n👤 ${name}\n🪪 ${
+        const msg = `🎫 *Nueva Participación*\\n\\n👤 ${name}\\n🪪 ${
           cedula || "N/A"
-        }\n📱 ${phone}\n📧 ${email || "N/A"}\n\n💰 Bs. ${amountPaid}\n🏦 ${
+        }\\n📱 ${phone}\\n📧 ${email || "N/A"}\\n\\n💰 Bs. ${amountPaid}\\n🏦 ${
           bankFrom || "N/A"
-        }\n🔢 Ref: ...${reference}\n\n🎰 Números: ${ticketNumbers.join(", ")}`;
+        }\\n🔢 Ref: ...${reference}\\n\\n🎰 Números: ${ticketNumbers.join(
+          ", "
+        )}`;
 
         await fetch(
           `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -223,8 +226,8 @@ app.post("/validate-payment", async (req, res) => {
             body: JSON.stringify({
               chat_id: TELEGRAM_CHAT_ID,
               text: msg,
-              parse_mode: "Markdown"
-            })
+              parse_mode: "Markdown",
+            }),
           }
         );
       }
@@ -233,11 +236,11 @@ app.post("/validate-payment", async (req, res) => {
     }
 
     res.json({ success: true, ticketNumbers });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error general:", e);
     res.status(500).json({
       success: false,
-      error: "Error interno: " + e.message
+      error: "Error interno: " + e.message,
     });
   }
 });
