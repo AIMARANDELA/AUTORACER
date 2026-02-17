@@ -16,8 +16,8 @@ app.use((req, res, next) => {
 });
 
 const supabase = createClient(
-  process.env.SUPABASE_URL as string,
-  process.env.SUPABASE_SERVICE_ROLE_KEY as string
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const upload = multer({
@@ -67,7 +67,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       .getPublicUrl(filePath);
 
     res.json({ url: data.publicUrl });
-  } catch (e: any) {
+  } catch (e) {
     console.error("Upload error:", e);
     res.status(500).json({ error: "Error al subir archivo: " + e.message });
   }
@@ -76,7 +76,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 // POST /validate-payment
 app.post("/validate-payment", async (req, res) => {
   try {
-    // Lo que está mandando Lovable hoy:
+    // Body que manda Lovable:
     // {
     //   name, idNumber, phone,
     //   bank, reference, amount,
@@ -91,7 +91,6 @@ app.post("/validate-payment", async (req, res) => {
       reference,
       amount,
       paymentImageUrl,
-      // por si luego los agregas desde el front
       email,
       quantity
     } = req.body;
@@ -154,7 +153,7 @@ app.post("/validate-payment", async (req, res) => {
 
     console.log("Participante creado:", participant.id);
 
-    // Insert payment (SIN screenshot_base64)
+    // Insert payment
     const { error: payErr } = await supabase.from("payments").insert({
       participant_id: participant.id,
       bank_from: bankFrom,
@@ -182,8 +181,8 @@ app.post("/validate-payment", async (req, res) => {
       .maybeSingle();
 
     const startNum = (maxTicket?.ticket_number || 0) + 1;
-    const ticketNumbers: number[] = [];
-    const ticketInserts: any[] = [];
+    const ticketNumbers = [];
+    const ticketInserts = [];
 
     for (let i = 0; i < qty; i++) {
       const num = startNum + i;
@@ -207,10 +206,7 @@ app.post("/validate-payment", async (req, res) => {
 
     // Telegram notification (opcional)
     try {
-      const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env as {
-        TELEGRAM_BOT_TOKEN?: string;
-        TELEGRAM_CHAT_ID?: string;
-      };
+      const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env;
 
       if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
         const msg = `🎫 *Nueva Participación*\n\n👤 ${name}\n🪪 ${
@@ -237,7 +233,7 @@ app.post("/validate-payment", async (req, res) => {
     }
 
     res.json({ success: true, ticketNumbers });
-  } catch (e: any) {
+  } catch (e) {
     console.error("Error general:", e);
     res.status(500).json({
       success: false,
